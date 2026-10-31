@@ -31,6 +31,7 @@
     } catch (e) {
       if (signal && signal.aborted) throw new FetchError('Fetch cancelled.');
       if (ctrl.signal.aborted) throw new FetchError('The request timed out.', 'Try again, or reduce the max comments limit in Settings.');
+      if (e instanceof FetchError) throw e;
       throw new FetchError('Network error — could not reach the server.', 'Check your internet connection or any ad-blocker that may block the request.');
     } finally {
       clearTimeout(timer);
@@ -137,17 +138,72 @@
     return Core.normalizeItems(res.items);
   }
 
+  /* ------------------------ Site's own server -------------------------- */
+
+  const SERVER_ENDPOINT = '/.netlify/functions/comments';
+
+  function noServerError() {
+    const err = new FetchError('Auto-fetch isn’t available here.', 'Paste the comments below, or add your own key in Settings.');
+    err.needsSetup = true;
+    return err;
+  }
+
+  /** Uses the site's serverless function, so visitors need no login or API key. */
+  async function fetchViaServer(post, onStatus, signal) {
+    if (!/^https?:$/.test(root.location.protocol)) throw noServerError();
+    let start;
+    try {
+      start = await requestJSON(SERVER_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: post.url }),
+      }, 20000, signal);
+    } catch (e) {
+      if (e.body && e.body.code === 'NOT_CONFIGURED') throw noServerError();
+      if (e.body && e.body.error) throw new FetchError(e.body.error);
+      if (e.status) throw noServerError(); // static hosting without the function (404/405/501…)
+      throw e;
+    }
+    if (!start || !start.runId) throw noServerError();
+
+    const startedAt = Date.now();
+    const messages = ['Reading comments from Instagram…', 'Collecting replies and mentions…', 'Almost there — large posts take a bit longer…'];
+    let delay = 2500;
+    while (Date.now() - startedAt < 5 * 60 * 1000) {
+      onStatus && onStatus(messages[Math.min(messages.length - 1, Math.floor((Date.now() - startedAt) / 15000))]);
+      await new Promise((resolve, reject) => {
+        const onAbort = () => { clearTimeout(t); reject(new FetchError('Fetch cancelled.')); };
+        const t = setTimeout(() => { if (signal) signal.removeEventListener('abort', onAbort); resolve(); }, delay);
+        if (signal) {
+          if (signal.aborted) onAbort();
+          else signal.addEventListener('abort', onAbort, { once: true });
+        }
+      });
+      delay = Math.min(5000, delay + 500);
+      let res;
+      try {
+        res = await requestJSON(`${SERVER_ENDPOINT}?runId=${encodeURIComponent(start.runId)}`, { method: 'GET' }, 25000, signal);
+      } catch (e) {
+        if (signal && signal.aborted) throw e;
+        if (e.body && e.body.error) throw new FetchError(e.body.error);
+        continue; // transient network hiccup — keep polling
+      }
+      if (res.status === 'SUCCEEDED') return Core.normalizeItems(res.comments || []);
+      if (res.status === 'FAILED') throw new FetchError(res.error || 'Could not read comments for this post.', 'Make sure the post is public, or paste the comments below.');
+    }
+    throw new FetchError('This post is taking too long.', 'Try again in a minute, or paste the comments below.');
+  }
+
   /**
-   * Fetch comments for a post using whichever providers are configured.
-   * Graph API is tried first (official, free); Apify is the fallback that works for any public post.
+   * Fetch comments for a post.
+   * Personal keys (Settings) are used if present; otherwise the site's own server does the work.
    */
   async function fetchComments(post, settings, onStatus, signal) {
     const hasGraph = !!(settings.graphToken || '').trim();
     const hasApify = !!(settings.apifyToken || '').trim();
     if (!hasGraph && !hasApify) {
-      const err = new FetchError('Auto-fetch is not set up yet.', 'Add a free Apify token (or your Instagram Graph API token) in Settings — one-time setup.');
-      err.needsSetup = true;
-      throw err;
+      onStatus && onStatus('Fetching comments…');
+      return { comments: await fetchViaServer(post, onStatus, signal), provider: 'Instagram' };
     }
     let graphError = null;
     if (hasGraph) {

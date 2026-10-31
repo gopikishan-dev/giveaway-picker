@@ -71,7 +71,7 @@
           <div class="fetch-anim"><span></span><span></span><span></span></div>
           <div class="fetch-text">
             <strong id="fetchStatusText">Fetching comments…</strong>
-            <small>Large posts can take up to a minute.</small>
+            <small>Usually 15–60 seconds, depending on the number of comments.</small>
           </div>
           <button class="btn btn-ghost btn-sm" id="cancelFetch" type="button">Cancel</button>
         </div>
@@ -304,10 +304,10 @@
     <div class="modal-backdrop" data-close></div>
     <div class="modal-card glass" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <div class="modal-head">
-        <h2 id="settingsTitle">Auto-fetch setup</h2>
+        <h2 id="settingsTitle">Your own keys <span class="pill">Optional</span></h2>
         <button class="icon-btn" type="button" data-close aria-label="Close">&times;</button>
       </div>
-      <p class="muted small">Instagram doesn't let websites read comments anonymously, so auto-fetch uses a connector. Set up either one, just once — keys are stored only in this browser.</p>
+      <p class="muted small">Not needed — just paste a post link and comments are fetched for you. Add a personal key only if you want to use your own quota. Keys are stored only in this browser.</p>
 
       <div class="tabs" role="tablist">
         <button class="tab active" role="tab" type="button" data-tab="apify" aria-selected="true">Any public post <span class="pill">Recommended</span></button>

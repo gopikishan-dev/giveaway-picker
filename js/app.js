@@ -204,6 +204,7 @@
   function showFetchError(err) {
     $('#fetchErrorTitle').textContent = err.message || 'Something went wrong.';
     $('#fetchErrorHint').textContent = err.hint || '';
+    $('#fetchError [data-action="open-settings"]').hidden = !err.needsSetup;
     $('#fetchError').hidden = false;
   }
 
@@ -218,11 +219,6 @@
         $('#urlMsg').className = 'field-msg';
         $('#postUrl').focus();
       }
-      return;
-    }
-    if (!settings.apifyToken && !settings.graphToken) {
-      showFetchError({ message: 'Auto-fetch needs a one-time setup.', hint: 'Instagram blocks websites from reading comments directly. Add a free Apify token in Settings (takes 1 minute), or paste the comments below.' });
-      openModal('#settingsModal');
       return;
     }
     const ctrl = new AbortController();
