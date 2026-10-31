@@ -55,3 +55,15 @@ test('blocks other origins when ALLOWED_ORIGIN is set', async () => {
   assert.strictEqual(r.statusCode, 403);
   delete process.env.ALLOWED_ORIGIN;
 });
+
+test('flags runs stopped by the Apify free-plan limit', async () => {
+  process.env.APIFY_TOKEN = 'secret';
+  global.fetch = async (url) => {
+    const body = /\/log/.test(url) ? 'INFO stopping pagination: free user limit reached'
+      : /actor-runs/.test(url) ? JSON.stringify({ data: { status: 'SUCCEEDED', defaultDatasetId: 'DS1' } })
+      : JSON.stringify([{ id: '1', ownerUsername: 'ram', text: 'hi' }]);
+    return { ok: true, status: 200, text: async () => body };
+  };
+  const r = await handler({ httpMethod: 'GET', headers: {}, queryStringParameters: { runId: 'RUNabc12345' } });
+  assert.strictEqual(JSON.parse(r.body).limited, true);
+});

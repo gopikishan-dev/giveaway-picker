@@ -188,7 +188,7 @@
         if (e.body && e.body.error) throw new FetchError(e.body.error);
         continue; // transient network hiccup — keep polling
       }
-      if (res.status === 'SUCCEEDED') return Core.normalizeItems(res.comments || []);
+      if (res.status === 'SUCCEEDED') return { comments: Core.normalizeItems(res.comments || []), limited: !!res.limited };
       if (res.status === 'FAILED') throw new FetchError(res.error || 'Could not read comments for this post.', 'Make sure the post is public, or paste the comments below.');
     }
     throw new FetchError('This post is taking too long.', 'Try again in a minute, or paste the comments below.');
@@ -203,7 +203,8 @@
     const hasApify = !!(settings.apifyToken || '').trim();
     if (!hasGraph && !hasApify) {
       onStatus && onStatus('Fetching comments…');
-      return { comments: await fetchViaServer(post, onStatus, signal), provider: 'Instagram' };
+      const res = await fetchViaServer(post, onStatus, signal);
+      return { comments: res.comments, limited: res.limited, provider: 'Instagram' };
     }
     let graphError = null;
     if (hasGraph) {

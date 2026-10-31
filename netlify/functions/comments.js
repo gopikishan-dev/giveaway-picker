@@ -100,7 +100,13 @@ exports.handler = async (event) => {
       if (!comments.length && failed) {
         return reply(200, { status: 'FAILED', error: 'This post could not be read. Make sure it is public and the link is correct.' }, allowed);
       }
-      return reply(200, { status: 'SUCCEEDED', comments }, allowed);
+      // Apify's free plan stops after ~15 comments; tell the visitor so they can paste the rest.
+      let limited = false;
+      try {
+        const logRes = await fetch(`${API}/actor-runs/${runId}/log?token=${encodeURIComponent(token)}`);
+        if (logRes.ok) limited = /free user limit reached|freeUserLimit/i.test(await logRes.text());
+      } catch (e) { /* log is optional */ }
+      return reply(200, { status: 'SUCCEEDED', comments, limited }, allowed);
     }
 
     return reply(405, { error: 'Method not allowed.' }, allowed);

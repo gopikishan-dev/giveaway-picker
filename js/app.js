@@ -231,7 +231,7 @@
         showFetchError({ message: 'No comments found on this post.', hint: 'If the post has comments, it may be private or comments may be turned off.' });
         return;
       }
-      setComments(res.comments, post, res.provider);
+      setComments(res.comments, post, res.provider, res.limited);
       toast(`Loaded ${plural(res.comments.length, 'comment')} ✓`, 'ok');
     } catch (err) {
       if (!ctrl.signal.aborted) showFetchError(err);
@@ -303,7 +303,9 @@
     onParse();
   }
 
-  function setComments(comments, post, source) {
+  function setComments(comments, post, source, limited) {
+    $('#limitNote').hidden = !limited;
+    $('#limitCount').textContent = fmt(comments.length);
     state.comments = comments;
     state.post = post || null;
     state.source = source;
